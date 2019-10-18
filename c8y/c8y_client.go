@@ -3,6 +3,7 @@ package c8y
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 )
@@ -19,6 +20,7 @@ func C8yBootstrap(tenant string, password string) (string, error) {
 	c8yAuth := make(chan string)
 	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
 		authorization := string(msg.Payload())
+		log.Println("received authorization: " + authorization)
 		if strings.HasPrefix(authorization, "70") {
 			c8yAuth <- authorization
 		}
@@ -27,16 +29,17 @@ func C8yBootstrap(tenant string, password string) (string, error) {
 
 	// configure OnConnect callback: subscribe
 	opts.OnConnect = func(c MQTT.Client) {
+		log.Println("connected")
 		if token := c.Subscribe("s/dcr", 0, receive); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
 			return
 		}
 
-		pubTopic := "s/ucr"
-		c.Publish(pubTopic, 0, false, nil)
+		c.Publish("s/ucr", 0, false, nil)
 	}
 
 	client := MQTT.NewClient(opts)
+	log.Println("connecting...")
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return "", token.Error()
 	}
