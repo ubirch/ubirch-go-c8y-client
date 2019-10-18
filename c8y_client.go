@@ -7,21 +7,29 @@ import (
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-func C8yBootstrap(tenant string, password string, handler MQTT.MessageHandler) (MQTT.Client, error) {
-	opts := MQTT.NewClientOptions().AddBroker(tenant + ".cumulocity.com:8883") // scheme://host:port
+func C8yBootstrap(tenant string, password string, handler MQTT.MessageHandler) (string, error) {
+	// configure MQTT client
+	opts := MQTT.NewClientOptions().AddBroker("tcp://" + tenant + ".cumulocity.com:8883") // scheme://host:port
 	opts.SetUsername("management/devicebootstrap")
 	opts.SetUsername(password)
 	opts.SetClientID(tenant + "-c8y-mqtt-client")
 	if handler != nil {
 		opts.SetDefaultPublishHandler(handler)
 	}
-	topic := "s/dcr"
 
+	// configure OnConnect callback: subscribe
+	subTopic := "s/dcr"
 	opts.OnConnect = func(c MQTT.Client) {
-		if token := c.Subscribe(topic, 0, handler); token.Wait() && token.Error() != nil {
+		if token := c.Subscribe(subTopic, 0, handler); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
 	}
+
+	// configure OnMessage callback -> if message.payload starts with b'70': authorization = message.payload -> publish
+	c8yAuth := "TODO"
+
+	// enable SSL/TLS support
+
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
@@ -29,5 +37,13 @@ func C8yBootstrap(tenant string, password string, handler MQTT.MessageHandler) (
 		log.Printf("connected to mqtt server: %v", client)
 	}
 
-	return client, nil
+	// wait for answer (OnMessage callback)
+
+	// publish
+	pubTopic := "s/ucr"
+	client.Publish(pubTopic, 0, false, nil) // TODO check if that's right
+
+	client.Disconnect(999)
+
+	return c8yAuth, nil
 }
