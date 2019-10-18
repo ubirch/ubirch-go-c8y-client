@@ -21,7 +21,7 @@ func main() {
 	// bootstrap
 	c8yAuth, err := c8y.C8yBootstrap(tenant, c8yPassword)
 	if err != nil {
-		fmt.Printf(tenant + " : " + c8yPassword)
+		log.Printf("tenant: %s, password: %s\n", tenant, c8yPassword)
 		log.Fatalf("unable to bootstrap device: %v", err)
 	}
 
