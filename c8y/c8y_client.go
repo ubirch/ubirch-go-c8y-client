@@ -11,7 +11,7 @@ import MQTT "github.com/eclipse/paho.mqtt.golang"
 
 func C8yBootstrap(tenant string, password string) (string, error) {
 	// configure MQTT client
-	address := "tcps://mqtt.cumulocity.com:8883/mqtt"
+	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	log.Println(address)
 	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
 	opts.SetUsername("management/devicebootstrap")

@@ -8,9 +8,10 @@ import (
 
 // configuration of the client
 type Config struct {
-	Tenant   string `json:"tenant"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+	Bootstrap string `json:"bootstrap"`
+	Tenant    string `json:"tenant"`
+	User      string `json:"user"`
+	Password  string `json:"password"`
 }
 
 func (c *Config) Load(filename string) {

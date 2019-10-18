@@ -20,12 +20,11 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	//// bootstrap
-	//c8yAuth, err := c8y.C8yBootstrap(tenant, c8yPassword)
-	//if err != nil {
-	//	log.Printf("tenant: %s, password: %s\n", tenant, c8yPassword)
-	//	log.Fatalf("unable to bootstrap device: %v", err)
-	//}
-	//
-	//fmt.Printf(tenant + " : " + c8yPassword + " : " + c8yAuth)
+	// bootstrap
+	c8yAuth, err := c8y.C8yBootstrap(conf.Tenant, conf.Bootstrap)
+	if err != nil {
+		log.Printf("tenant: %s, password: %s\n", conf.Tenant, conf.Password)
+		log.Fatalf("unable to bootstrap device: %v", err)
+	}
+	log.Printf(c8yAuth)
 }
