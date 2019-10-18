@@ -9,6 +9,7 @@ import (
 // configuration of the client
 type Config struct {
 	Tenant   string `json:"tenant"`
+	User     string `json:"user"`
 	Password string `json:"password"`
 }
 
