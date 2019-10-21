@@ -11,9 +11,9 @@ import MQTT "github.com/eclipse/paho.mqtt.golang"
 
 func Bootstrap(tenant string, uuid string, password string) (string, error) {
 	// configure MQTT client
-	address := "tcps://" + tenant + ".cumulocity.com:8883/"
+	address := "tcps://" + tenant + ".cumulocity.com:8883/" // scheme://host:port
 	log.Println(address)
-	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
+	opts := MQTT.NewClientOptions().AddBroker(address)
 	opts.SetUsername("management/devicebootstrap")
 	opts.SetPassword(password)
 	opts.SetClientID(uuid)
@@ -80,20 +80,47 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 	}
 }
 
-func Send(tenant string, uuid string, user string, password string) error {
+func Send(uuid string, tenant string, user string, password string) error {
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
+	opts.SetClientID(uuid)
 	opts.SetUsername(tenant + "/" + user)
 	opts.SetPassword(password)
-	opts.SetClientID(uuid)
+
+	c8yError := make(chan error)
+
+	// receive-callback
+	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+		answer := string(msg.Payload())
+		log.Println("received message:" + answer)
+	}
+
+	// configure OnConnect callback: subscribe
+	opts.OnConnect = func(c MQTT.Client) {
+		log.Println("MQTT client connected.")
+
+		// subscribe to error messages
+		if token := c.Subscribe("s/e", 0, receive); token.Wait() && token.Error() != nil {
+			c8yError <- token.Error()
+			return
+		}
+
+		println("publishing...")
+		if token := c.Publish("s/us", 2, false, "211,25"); token.Wait() && token.Error() != nil {
+			c8yError <- token.Error()
+			return
+		}
+	}
 
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 
-	token := client.Publish("s/us", 0, false, "211,25")
-	token.Wait()
-	return token.Error()
+	defer client.Disconnect(0)
 
+	select {
+	case err := <-c8yError:
+		return err
+	}
 }
