@@ -4,19 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"strings"
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-func C8yBootstrap(tenant string, password string) (string, error) {
+func Bootstrap(tenant string, uuid string, password string) (string, error) {
 	// configure MQTT client
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	log.Println(address)
 	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
 	opts.SetUsername("management/devicebootstrap")
 	opts.SetPassword(password)
-	opts.SetClientID(fmt.Sprintf("%s-c8y-mqtt-client-%d", tenant, rand.Uint32()))
+	opts.SetClientID(uuid)
 	c8yError := make(chan error)
 	c8yAuth := make(chan string)
 	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
@@ -34,8 +33,7 @@ func C8yBootstrap(tenant string, password string) (string, error) {
 			return
 		}
 
-		pubTopic := "s/ucr"
-		c.Publish(pubTopic, 0, false, nil)
+		c.Publish("s/ucr", 0, false, nil)
 	}
 
 	client := MQTT.NewClient(opts)
@@ -52,12 +50,12 @@ func C8yBootstrap(tenant string, password string) (string, error) {
 	}
 }
 
-func Send(tenant string, user string, password string) error {
+func Send(tenant string, uuid string, user string, password string) error {
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
 	opts.SetUsername(tenant + "/" + user)
 	opts.SetPassword(password)
-	opts.SetClientID(fmt.Sprintf("%s-c8y-mqtt-client-%d", tenant, rand.Uint32()))
+	opts.SetClientID(uuid)
 
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {

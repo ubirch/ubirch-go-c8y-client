@@ -8,6 +8,7 @@ import (
 
 // configuration of the client
 type Config struct {
+	UUID      string `json:"uuid"`
 	Bootstrap string `json:"bootstrap"`
 	Tenant    string `json:"tenant"`
 	User      string `json:"user"`
