@@ -34,6 +34,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	println(done)
+	if done {
+		log.Println("done")
+	} else {
+		log.Println("something went wrong")
+	}
 
 }

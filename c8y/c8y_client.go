@@ -59,7 +59,7 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 
 		// publish until answer received
 		for !answerReceived {
-			println("publishing...")
+			log.Println("publishing...")
 			c.Publish("s/ucr", 0, false, nil)
 			time.Sleep(10 * time.Second)
 		}
@@ -88,7 +88,7 @@ func GetClient(uuid string, tenant string, user string, password string) (bool, 
 	opts.SetPassword(password)
 
 	c8yError := make(chan error)
-	c8yDone := make(chan bool)
+	c8yReady := make(chan bool)
 
 	// receive-callback
 	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
@@ -110,19 +110,14 @@ func GetClient(uuid string, tenant string, user string, password string) (bool, 
 		if token := c.Subscribe("s/e", 0, receive); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
 			return
-		}
-
-		println("publishing...")
-		if token := c.Publish("s/us", 0, false, "200,c8y_Switch,B,0"); token.Wait() && token.Error() != nil {
-			c8yError <- token.Error()
-			return
 		} else {
-			c8yDone <- true
+			c8yReady <- true
 			return
 		}
 	}
 
 	client := MQTT.NewClient(opts)
+	log.Println("connecting...")
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return false, token.Error()
 	}
@@ -130,8 +125,12 @@ func GetClient(uuid string, tenant string, user string, password string) (bool, 
 	defer client.Disconnect(0)
 
 	select {
-	case done := <-c8yDone:
-		return done, nil
+	case ready := <-c8yReady:
+		log.Println("publishing...")
+		if token := client.Publish("s/us", 0, false, "200,c8y_Switch,B,1"); token.Wait() && token.Error() != nil {
+			return false, token.Error()
+		}
+		return ready, nil
 	case err := <-c8yError:
 		return false, err
 	}
