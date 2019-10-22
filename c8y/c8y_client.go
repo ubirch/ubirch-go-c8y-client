@@ -80,7 +80,7 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 	}
 }
 
-func Send(uuid string, tenant string, user string, password string) error {
+func GetClient(uuid string, tenant string, user string, password string) (bool, error) {
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
 	opts.SetClientID(uuid)
@@ -88,6 +88,7 @@ func Send(uuid string, tenant string, user string, password string) error {
 	opts.SetPassword(password)
 
 	c8yError := make(chan error)
+	c8yDone := make(chan bool)
 
 	// receive-callback
 	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
@@ -99,6 +100,12 @@ func Send(uuid string, tenant string, user string, password string) error {
 	opts.OnConnect = func(c MQTT.Client) {
 		log.Println("MQTT client connected.")
 
+		//// subscribe to messages // FIXME this seems to block
+		//if token := c.Subscribe("s/ds", 0, receive); token.Wait() && token.Error() != nil {
+		//	c8yError <- token.Error()
+		//	return
+		//}
+
 		// subscribe to error messages
 		if token := c.Subscribe("s/e", 0, receive); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
@@ -106,21 +113,26 @@ func Send(uuid string, tenant string, user string, password string) error {
 		}
 
 		println("publishing...")
-		if token := c.Publish("s/us", 2, false, "211,25"); token.Wait() && token.Error() != nil {
+		if token := c.Publish("s/us", 0, false, "200,c8y_Switch,B,0"); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
+			return
+		} else {
+			c8yDone <- true
 			return
 		}
 	}
 
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		return token.Error()
+		return false, token.Error()
 	}
 
 	defer client.Disconnect(0)
 
 	select {
+	case done := <-c8yDone:
+		return done, nil
 	case err := <-c8yError:
-		return err
+		return false, err
 	}
 }

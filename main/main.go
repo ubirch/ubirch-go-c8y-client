@@ -30,8 +30,10 @@ func main() {
 	//}
 	//log.Println(c8yAuth)
 
-	err := c8y.Send(UUID, c8yTenant, c8yUser, c8yPassword)
+	done, err := c8y.GetClient(UUID, c8yTenant, c8yUser, c8yPassword)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
+	println(done)
+
 }
