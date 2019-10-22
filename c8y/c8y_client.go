@@ -1,13 +1,56 @@
 package c8y
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
+
+func BootstrapHTTP(uuid string, tenant string, password string) {
+	data, err := json.Marshal(map[string]string{
+		"id": uuid,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	timeout := 5 * time.Second
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	request, err := http.NewRequest("POST",
+		"https://ubirch.cumulocity.com/devicecontrol/deviceCredentials",
+		bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Set("Content-Type", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
+	request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
+	request.SetBasicAuth("devicebootstrap", password)
+
+	resp, err := client.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	bodyString := string(bodyBytes)
+	log.Println(bodyString)
+
+	fmt.Println("Response status:", resp.Status)
+}
 
 func Bootstrap(uuid string, tenant string, password string) (string, error) {
 	// configure MQTT client
@@ -63,7 +106,7 @@ func Bootstrap(uuid string, tenant string, password string) (string, error) {
 		// publish until answer received
 		for !answerReceived {
 			log.Println("publishing...")
-			c.Publish("s/ucr", 2, false, nil)
+			c.Publish("s/ucr", 0, false, nil)
 			time.Sleep(5 * time.Second)
 		}
 	}

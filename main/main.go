@@ -23,11 +23,13 @@ func main() {
 	log.Println("UUID: " + UUID)
 
 	// bootstrap
-	c8yAuth, err := c8y.Bootstrap(UUID, c8yTenant, c8yBootstrap)
-	if err != nil {
-		log.Fatalf("unable to bootstrap device: %v", err)
-	}
-	log.Println(c8yAuth)
+	c8y.BootstrapHTTP(UUID, c8yTenant, c8yBootstrap)
+
+	//c8yAuth, err := c8y.Bootstrap(UUID, c8yTenant, c8yBootstrap)
+	//if err != nil {
+	//	log.Fatalf("unable to bootstrap device: %v", err)
+	//}
+	//log.Println(c8yAuth)
 
 	//client, err := c8y.GetClient(UUID, c8yTenant, c8yUser, c8yPassword)
 	//if err != nil {
