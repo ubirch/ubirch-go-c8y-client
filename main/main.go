@@ -20,7 +20,7 @@ func main() {
 	c8yUser := conf.User
 	c8yPassword := conf.Password
 
-	println("UUID: " + UUID)
+	log.Println("UUID: " + UUID)
 
 	//// bootstrap
 	//c8yAuth, err := c8y.Bootstrap(c8yTenant, UUID, c8yBootstrap)
@@ -30,14 +30,15 @@ func main() {
 	//}
 	//log.Println(c8yAuth)
 
-	done, err := c8y.GetClient(UUID, c8yTenant, c8yUser, c8yPassword)
+	client, err := c8y.GetClient(UUID, c8yTenant, c8yUser, c8yPassword)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	if done {
-		log.Println("done")
-	} else {
-		log.Println("something went wrong")
+
+	err = c8y.Send(client, 1)
+	if err != nil {
+		log.Fatalf("error: %v", err)
 	}
 
+	defer client.Disconnect(0)
 }
