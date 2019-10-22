@@ -9,7 +9,7 @@ import (
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-func Bootstrap(tenant string, uuid string, password string) (string, error) {
+func Bootstrap(uuid string, tenant string, password string) (string, error) {
 	// configure MQTT client
 	address := "tcps://" + tenant + ".cumulocity.com:8883/" // scheme://host:port
 	log.Println(address)
@@ -17,12 +17,14 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 	opts.SetUsername("management/devicebootstrap")
 	opts.SetPassword(password)
 	opts.SetClientID(uuid)
+
 	c8yError := make(chan error)
 	c8yAuth := make(chan string)
 
 	answerReceived := false
+
 	// Answer receive-callback
-	var authReceive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	authReceive := func(client MQTT.Client, msg MQTT.Message) {
 		answerReceived = true
 		answer := string(msg.Payload())
 		if strings.HasPrefix(answer, "70") {
@@ -33,12 +35,13 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 			c8yError <- errors.New(fmt.Sprintf("unknown message received: %v", msg))
 		}
 	}
+
 	// Error receive-callback
-	var errReceive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	errReceive := func(client MQTT.Client, msg MQTT.Message) {
 		answerReceived = true
 		answer := string(msg.Payload())
 		log.Println("received error message:" + answer)
-		c8yError <- errors.New(fmt.Sprintf("unknown message received: %v", msg))
+		c8yError <- errors.New(fmt.Sprintf("error message received: %v", msg))
 	}
 
 	// configure OnConnect callback: subscribe
@@ -60,8 +63,8 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 		// publish until answer received
 		for !answerReceived {
 			log.Println("publishing...")
-			c.Publish("s/ucr", 0, false, nil)
-			time.Sleep(10 * time.Second)
+			c.Publish("s/ucr", 2, false, nil)
+			time.Sleep(5 * time.Second)
 		}
 	}
 
@@ -82,7 +85,7 @@ func Bootstrap(tenant string, uuid string, password string) (string, error) {
 
 func GetClient(uuid string, tenant string, user string, password string) (MQTT.Client, error) {
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
-	opts := MQTT.NewClientOptions().AddBroker(address) // scheme://host:port
+	opts := MQTT.NewClientOptions().AddBroker(address)
 	opts.SetClientID(uuid)
 	opts.SetUsername(tenant + "/" + user)
 	opts.SetPassword(password)
