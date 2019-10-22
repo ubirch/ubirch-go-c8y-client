@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ubirch/ubirch-go-c8y-client/c8y"
 	"log"
+	"time"
 )
 
 const ConfigFile = "config.json"
@@ -34,11 +35,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-
-	err = c8y.Send(client, 1)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-
 	defer client.Disconnect(0)
+
+	value := true
+	for {
+		err = c8y.Send(client, value)
+		if err != nil {
+			log.Fatalf("error: %v", err)
+		}
+		value = !value
+		time.Sleep(2 * time.Second)
+	}
 }

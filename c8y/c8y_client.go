@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -91,13 +90,13 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 	c8yError := make(chan error)
 	c8yReady := make(chan bool)
 
-	// receive-callback
-	var receive MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	// callback for error messages
+	receive := func(client MQTT.Client, msg MQTT.Message) {
 		answer := string(msg.Payload())
 		log.Println("received error message:" + answer)
 	}
 
-	// configure OnConnect callback: subscribe
+	// configure OnConnect callback: subscribe to error messages when connected
 	opts.OnConnect = func(c MQTT.Client) {
 		log.Println("MQTT client connected.")
 
@@ -109,11 +108,13 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 		}
 	}
 
+	// create client and connect
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
 
+	// wait for OnConnect callback
 	select {
 	case _ = <-c8yReady:
 		return client, nil
@@ -122,9 +123,16 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 	}
 }
 
-func Send(c MQTT.Client, valueToSend int) error {
-	message := "200,c8y_Value,V," + strconv.Itoa(valueToSend)
-	log.Println("publishing...")
+func Send(c MQTT.Client, valueToSend bool) error {
+	var message string
+	if valueToSend {
+		// send true (1)
+		message = "200,c8y_Bool,B,1"
+	} else {
+		// send false (0)
+		message = "200,c8y_Bool,B,0"
+	}
+
 	if token := c.Publish("s/us", 0, false, message); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
