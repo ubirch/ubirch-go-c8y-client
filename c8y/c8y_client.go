@@ -13,7 +13,15 @@ import (
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-func BootstrapHTTP(uuid string, tenant string, password string) {
+type c8yResponseForm struct {
+	Password string `json:"password"`
+	Tenant   string `json:"tenantId"`
+	Self     string `json:"self"`
+	ID       string `json:"id"`
+	User     string `json:"username"`
+}
+
+func BootstrapHTTP(uuid string, tenant string, password string) (string, string) {
 	data, err := json.Marshal(map[string]string{
 		"id": uuid,
 	})
@@ -36,20 +44,38 @@ func BootstrapHTTP(uuid string, tenant string, password string) {
 	request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
 	request.SetBasicAuth("devicebootstrap", password)
 
-	resp, err := client.Do(request)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
+	for {
+		resp, err := client.Do(request)
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		//defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyString := string(bodyBytes)
-	log.Println(bodyString)
+		log.Println("Response status:", resp.Status)
 
-	fmt.Println("Response status:", resp.Status)
+		if resp.StatusCode == http.StatusCreated {
+			responseForm := c8yResponseForm{}
+
+			// read response body
+			bodyBytes, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatalf("ERROR: unable to read response: %v", err)
+			}
+
+			// parse json response body
+			err = json.Unmarshal(bodyBytes, &responseForm)
+			if err != nil {
+				log.Fatalf("ERROR: unable to parse response: %v", err)
+			}
+
+			bodyString := string(bodyBytes)
+			log.Println(bodyString)
+
+			return responseForm.User, responseForm.Password
+		}
+		resp.Body.Close()
+		time.Sleep(5 * time.Second)
+	}
 }
 
 func Bootstrap(uuid string, tenant string, password string) (string, error) {
