@@ -13,7 +13,7 @@ import (
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-type c8yResponseForm struct {
+type c8yCredentials struct {
 	Password string `json:"password"`
 	Tenant   string `json:"tenantId"`
 	Self     string `json:"self"`
@@ -22,6 +22,7 @@ type c8yResponseForm struct {
 }
 
 func BootstrapHTTP(uuid string, tenant string, password string) (string, string) {
+	log.Println("Bootstrapping")
 	data, err := json.Marshal(map[string]string{
 		"id": uuid,
 	})
@@ -49,7 +50,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 		log.Println("Response status:", resp.Status)
 
 		if resp.StatusCode == http.StatusCreated {
-			responseForm := c8yResponseForm{}
+			deviceCredentials := c8yCredentials{}
 
 			// read response body
 			bodyBytes, err := ioutil.ReadAll(resp.Body)
@@ -60,16 +61,17 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 			log.Println(bodyString)
 
 			// parse json response body
-			err = json.Unmarshal(bodyBytes, &responseForm)
+			err = json.Unmarshal(bodyBytes, &deviceCredentials)
 			if err != nil {
 				log.Fatalf("ERROR: unable to parse response: %v", err)
 			}
+			resp.Body.Close()
 
 			// get username and password from response
-			return responseForm.User, responseForm.Password
+			return deviceCredentials.User, deviceCredentials.Password
 		}
 		resp.Body.Close()
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -172,6 +174,11 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 			c8yError <- token.Error()
 		} else {
 			c8yReady <- true
+		}
+
+		deviceCreationMsg := "100," + uuid + ",c8y_MQTTDevice" // "100,Device Name,Device Type"
+		if token := c.Publish("s/us", 0, false, deviceCreationMsg); token.Wait() && token.Error() != nil {
+			c8yError <- token.Error()
 		}
 	}
 
