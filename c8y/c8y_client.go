@@ -3,6 +3,7 @@ package c8y
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/eclipse/paho.mqtt.golang"
 	"io/ioutil"
 	"log"
@@ -149,15 +150,13 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 func Send(c mqtt.Client, name string, value bool, timestamp time.Time) error {
 	log.Println("sending...")
 	const timeFormat = "2006-01-02T15:04:05.000Z"
-	log.Println(timestamp.Format(timeFormat))
-	var message string
+	// convert bool to integer
+	intValue := 0
 	if value {
-		// send true (1)
-		message = "200,c8y_Switch," + name + ",1,," + timestamp.Format(timeFormat)
-	} else {
-		// send false (0)
-		message = "200,c8y_Switch," + name + ",0,," + timestamp.Format(timeFormat)
+		intValue = 1
 	}
+	message := fmt.Sprintf("200,c8y_Switch,%s,%d,,%s", name, intValue, timestamp.Format(timeFormat))
+	log.Println(message)
 
 	if token := c.Publish("s/us", 0, false, message); token.Wait() && token.Error() != nil {
 		return token.Error()
