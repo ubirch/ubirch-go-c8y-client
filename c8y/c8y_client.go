@@ -16,7 +16,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 	log.Println("Bootstrapping")
 	data, err := json.Marshal(map[string]string{"id": uuid})
 	if err != nil {
-		panic(err)
+		log.Fatalf(err.Error())
 	}
 	url := "https://" + tenant + ".cumulocity.com/devicecontrol/deviceCredentials"
 	client := http.Client{}
@@ -24,7 +24,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 	for {
 		request, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
-			panic(err)
+			log.Fatalf(err.Error())
 		}
 		request.Header.Set("Content-Type", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
 		request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
@@ -73,24 +73,27 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 		deviceCredentials = BootstrapHTTP(uuid, tenant, bootstrapPW)
 		deviceCredentialsJson, err := json.Marshal(deviceCredentials)
 		if err != nil {
-			panic(err)
+			log.Fatalf(err.Error())
 		}
 
 		// create JSON file and write credentials to it
 		jsonFile, err := os.Create(credentialsFilename)
 		if err != nil {
-			panic(err)
+			log.Fatalf(err.Error())
 		}
 		defer jsonFile.Close()
 
-		n, err := jsonFile.Write(deviceCredentialsJson)
-		log.Printf("wrote %d bytes to %s \n", n, credentialsFilename)
+		_, err = jsonFile.Write(deviceCredentialsJson)
+		if err != nil {
+			log.Fatalf("ERROR: unable to write credentials to file %s: %v", credentialsFilename, err)
+		}
+		log.Printf("created credentials file: %s \n", credentialsFilename)
 
 	} else { // file exists
 		log.Println("reading credentials from file")
 		deviceCredentialsJson, err := ioutil.ReadFile(credentialsFilename)
 		if err != nil {
-			log.Fatalf("ERROR: unable to read device credentials file: %v", err)
+			log.Fatalf("ERROR: unable to read credentials from file %s: %v", credentialsFilename, err)
 		}
 		err = json.Unmarshal(deviceCredentialsJson, &deviceCredentials)
 		if err != nil {
@@ -111,7 +114,7 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 	// callback for error messages
 	receive := func(client mqtt.Client, msg mqtt.Message) {
 		answer := string(msg.Payload())
-		log.Println("received error message: " + answer)
+		log.Println("MQTT client received error message from Cumulocity: " + answer)
 	}
 
 	// configure OnConnect callback: subscribe to error messages when connected
@@ -147,16 +150,11 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 	}
 }
 
-func Send(c mqtt.Client, name string, value bool, timestamp time.Time) error {
-	log.Println("sending...")
+func Send(c mqtt.Client, name string, value byte, timestamp time.Time) error {
 	const timeFormat = "2006-01-02T15:04:05.000Z"
-	// convert bool to integer
-	intValue := 0
-	if value {
-		intValue = 1
-	}
-	message := fmt.Sprintf("200,c8y_Switch,%s,%d,,%s", name, intValue, timestamp.Format(timeFormat))
-	log.Println(message)
+
+	message := fmt.Sprintf("200,c8y_Switch,%s,%d,,%s", name, value, timestamp.Format(timeFormat))
+	log.Println("sending message to Cumulocity: " + message)
 
 	if token := c.Publish("s/us", 0, false, message); token.Wait() && token.Error() != nil {
 		return token.Error()
