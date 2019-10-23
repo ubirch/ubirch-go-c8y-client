@@ -29,27 +29,22 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 		panic(err)
 	}
 
-	timeout := 5 * time.Second
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	request, err := http.NewRequest("POST",
-		"https://ubirch.cumulocity.com/devicecontrol/deviceCredentials",
-		bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	request.Header.Set("Content-Type", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
-	request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
-	request.SetBasicAuth("devicebootstrap", password)
+	url := "https://" + tenant + ".cumulocity.com/devicecontrol/deviceCredentials"
+	client := http.Client{}
 
 	for {
+		request, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
+		if err != nil {
+			panic(err)
+		}
+		request.Header.Set("Content-Type", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
+		request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
+		request.SetBasicAuth("devicebootstrap", password)
+
 		resp, err := client.Do(request)
 		if err != nil {
-			log.Panic(err.Error())
+			log.Fatalf(err.Error())
 		}
-		//defer resp.Body.Close()
 
 		log.Println("Response status:", resp.Status)
 
@@ -61,6 +56,8 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 			if err != nil {
 				log.Fatalf("ERROR: unable to read response: %v", err)
 			}
+			bodyString := string(bodyBytes)
+			log.Println(bodyString)
 
 			// parse json response body
 			err = json.Unmarshal(bodyBytes, &responseForm)
@@ -68,9 +65,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 				log.Fatalf("ERROR: unable to parse response: %v", err)
 			}
 
-			bodyString := string(bodyBytes)
-			log.Println(bodyString)
-
+			// get username and password from response
 			return responseForm.User, responseForm.Password
 		}
 		resp.Body.Close()
