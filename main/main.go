@@ -16,21 +16,12 @@ func main() {
 	conf.Load(ConfigFile)
 
 	UUID := conf.UUID
-	c8yBootstrap := conf.Bootstrap
 	c8yTenant := conf.Tenant
+	c8yBootstrap := conf.Bootstrap
 
 	log.Println("UUID: " + UUID)
 
-	// bootstrap
-	c8yUser, c8yPassword := c8y.BootstrapHTTP(UUID, c8yTenant, c8yBootstrap)
-
-	//c8yAuth, err := c8y.Bootstrap(UUID, c8yTenant, c8yBootstrap)
-	//if err != nil {
-	//	log.Fatalf("unable to bootstrap device: %v", err)
-	//}
-	//log.Println(c8yAuth)
-
-	client, err := c8y.GetClient(UUID, c8yTenant, c8yUser, c8yPassword)
+	client, err := c8y.GetClient(UUID, c8yTenant, c8yBootstrap)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}

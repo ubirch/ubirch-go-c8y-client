@@ -3,33 +3,20 @@ package c8y
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
+	"os"
 	"time"
 )
 import MQTT "github.com/eclipse/paho.mqtt.golang"
 
-type c8yCredentials struct {
-	Password string `json:"password"`
-	Tenant   string `json:"tenantId"`
-	Self     string `json:"self"`
-	ID       string `json:"id"`
-	User     string `json:"username"`
-}
-
-func BootstrapHTTP(uuid string, tenant string, password string) (string, string) {
+func BootstrapHTTP(uuid string, tenant string, password string) map[string]string {
 	log.Println("Bootstrapping")
-	data, err := json.Marshal(map[string]string{
-		"id": uuid,
-	})
+	data, err := json.Marshal(map[string]string{"id": uuid})
 	if err != nil {
 		panic(err)
 	}
-
 	url := "https://" + tenant + ".cumulocity.com/devicecontrol/deviceCredentials"
 	client := http.Client{}
 
@@ -50,7 +37,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 		log.Println("Response status:", resp.Status)
 
 		if resp.StatusCode == http.StatusCreated {
-			deviceCredentials := c8yCredentials{}
+			deviceCredentials := make(map[string]string)
 
 			// read response body
 			bodyBytes, err := ioutil.ReadAll(resp.Body)
@@ -68,93 +55,54 @@ func BootstrapHTTP(uuid string, tenant string, password string) (string, string)
 			resp.Body.Close()
 
 			// get username and password from response
-			return deviceCredentials.User, deviceCredentials.Password
+			return deviceCredentials
 		}
 		resp.Body.Close()
 		time.Sleep(10 * time.Second)
 	}
 }
 
-func Bootstrap(uuid string, tenant string, password string) (string, error) {
-	// configure MQTT client
-	address := "tcps://" + tenant + ".cumulocity.com:8883/" // scheme://host:port
-	log.Println(address)
-	opts := MQTT.NewClientOptions().AddBroker(address)
-	opts.SetUsername("management/devicebootstrap")
-	opts.SetPassword(password)
-	opts.SetClientID(uuid)
+func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, error) {
+	var deviceCredentials map[string]string
+	// check for device credentials file
+	credentialsFilename := uuid + ".ini"
+	_, err := os.Stat(credentialsFilename)
+	if os.IsNotExist(err) { // file does not exist
+		// bootstrap
+		deviceCredentials = BootstrapHTTP(uuid, tenant, bootstrapPW)
+		deviceCredentialsJson, err := json.Marshal(deviceCredentials)
+		if err != nil {
+			panic(err)
+		}
 
-	c8yError := make(chan error)
-	c8yAuth := make(chan string)
+		// create JSON file and write credentials to it
+		jsonFile, err := os.Create(credentialsFilename)
+		if err != nil {
+			panic(err)
+		}
+		defer jsonFile.Close()
 
-	answerReceived := false
+		n, err := jsonFile.Write(deviceCredentialsJson)
+		log.Printf("wrote %d bytes to %s \n", n, credentialsFilename)
 
-	// Answer receive-callback
-	authReceive := func(client MQTT.Client, msg MQTT.Message) {
-		answerReceived = true
-		answer := string(msg.Payload())
-		if strings.HasPrefix(answer, "70") {
-			log.Println("received authorization: " + answer)
-			c8yAuth <- answer
-		} else {
-			log.Println("received unknown message:" + answer)
-			c8yError <- errors.New(fmt.Sprintf("unknown message received: %v", msg))
+	} else { // file exists
+		log.Println("reading credentials from file")
+		deviceCredentialsJson, err := ioutil.ReadFile(credentialsFilename)
+		if err != nil {
+			log.Fatalf("ERROR: unable to read device credentials file: %v", err)
+		}
+		err = json.Unmarshal(deviceCredentialsJson, &deviceCredentials)
+		if err != nil {
+			log.Fatalf("ERROR: unable to parse device credentials: %v", err)
 		}
 	}
 
-	// Error receive-callback
-	errReceive := func(client MQTT.Client, msg MQTT.Message) {
-		answerReceived = true
-		answer := string(msg.Payload())
-		log.Println("received error message:" + answer)
-		c8yError <- errors.New(fmt.Sprintf("error message received: %v", msg))
-	}
-
-	// configure OnConnect callback: subscribe
-	opts.OnConnect = func(c MQTT.Client) {
-		log.Println("MQTT client connected.")
-
-		// subscribe to authorization message
-		if token := c.Subscribe("s/dcr", 0, authReceive); token.Wait() && token.Error() != nil {
-			c8yError <- token.Error()
-			return
-		}
-
-		// subscribe to error messages
-		if token := c.Subscribe("s/e", 0, errReceive); token.Wait() && token.Error() != nil {
-			c8yError <- token.Error()
-			return
-		}
-
-		// publish until answer received
-		for !answerReceived {
-			log.Println("publishing...")
-			c.Publish("s/ucr", 0, false, nil)
-			time.Sleep(5 * time.Second)
-		}
-	}
-
-	client := MQTT.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		return "", token.Error()
-	}
-
-	defer client.Disconnect(0)
-
-	select {
-	case auth := <-c8yAuth:
-		return auth, nil
-	case err := <-c8yError:
-		return "", err
-	}
-}
-
-func GetClient(uuid string, tenant string, user string, password string) (MQTT.Client, error) {
+	// initialize MQTT client
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	opts := MQTT.NewClientOptions().AddBroker(address)
 	opts.SetClientID(uuid)
-	opts.SetUsername(tenant + "/" + user)
-	opts.SetPassword(password)
+	opts.SetUsername(tenant + "/" + deviceCredentials["username"])
+	opts.SetPassword(deviceCredentials["password"])
 
 	c8yError := make(chan error)
 	c8yReady := make(chan bool)
@@ -162,7 +110,7 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 	// callback for error messages
 	receive := func(client MQTT.Client, msg MQTT.Message) {
 		answer := string(msg.Payload())
-		log.Println("received error message:" + answer)
+		log.Println("received error message: " + answer)
 	}
 
 	// configure OnConnect callback: subscribe to error messages when connected
@@ -176,6 +124,7 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 			c8yReady <- true
 		}
 
+		// create device identity in cumulocity registry
 		deviceCreationMsg := "100," + uuid + ",c8y_MQTTDevice" // "100,Device Name,Device Type"
 		if token := c.Publish("s/us", 0, false, deviceCreationMsg); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
@@ -198,6 +147,7 @@ func GetClient(uuid string, tenant string, user string, password string) (MQTT.C
 }
 
 func Send(c MQTT.Client, valueToSend bool) error {
+	log.Println("sending...")
 	var message string
 	if valueToSend {
 		// send true (1)
