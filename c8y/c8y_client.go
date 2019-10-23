@@ -3,13 +3,13 @@ package c8y
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/eclipse/paho.mqtt.golang"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 )
-import MQTT "github.com/eclipse/paho.mqtt.golang"
 
 func BootstrapHTTP(uuid string, tenant string, password string) map[string]string {
 	log.Println("Bootstrapping")
@@ -62,7 +62,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 	}
 }
 
-func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, error) {
+func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, error) {
 	var deviceCredentials map[string]string
 	// check for device credentials file
 	credentialsFilename := uuid + ".ini"
@@ -99,7 +99,7 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, err
 
 	// initialize MQTT client
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
-	opts := MQTT.NewClientOptions().AddBroker(address)
+	opts := mqtt.NewClientOptions().AddBroker(address)
 	opts.SetClientID(uuid)
 	opts.SetUsername(tenant + "/" + deviceCredentials["username"])
 	opts.SetPassword(deviceCredentials["password"])
@@ -108,13 +108,13 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, err
 	c8yReady := make(chan bool)
 
 	// callback for error messages
-	receive := func(client MQTT.Client, msg MQTT.Message) {
+	receive := func(client mqtt.Client, msg mqtt.Message) {
 		answer := string(msg.Payload())
 		log.Println("received error message: " + answer)
 	}
 
 	// configure OnConnect callback: subscribe to error messages when connected
-	opts.OnConnect = func(c MQTT.Client) {
+	opts.OnConnect = func(c mqtt.Client) {
 		log.Println("MQTT client connected.")
 
 		// subscribe to error messages
@@ -132,7 +132,7 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, err
 	}
 
 	// create client and connect
-	client := MQTT.NewClient(opts)
+	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
@@ -146,7 +146,7 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (MQTT.Client, err
 	}
 }
 
-func Send(c MQTT.Client, valueToSend bool) error {
+func Send(c mqtt.Client, valueToSend bool) error {
 	log.Println("sending...")
 	var message string
 	if valueToSend {
