@@ -146,15 +146,17 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 	}
 }
 
-func Send(c mqtt.Client, valueToSend bool) error {
+func Send(c mqtt.Client, name string, value bool, timestamp time.Time) error {
 	log.Println("sending...")
+	const timeFormat = "2006-01-02T15:04:05.000Z"
+	log.Println(timestamp.Format(timeFormat))
 	var message string
-	if valueToSend {
+	if value {
 		// send true (1)
-		message = "200,c8y_Bool,B,1"
+		message = "200,c8y_Switch," + name + ",1,," + timestamp.Format(timeFormat)
 	} else {
 		// send false (0)
-		message = "200,c8y_Bool,B,0"
+		message = "200,c8y_Switch," + name + ",0,," + timestamp.Format(timeFormat)
 	}
 
 	if token := c.Publish("s/us", 0, false, message); token.Wait() && token.Error() != nil {

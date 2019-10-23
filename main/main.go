@@ -27,9 +27,13 @@ func main() {
 	}
 	defer client.Disconnect(0)
 
+	switchName1 := "switch1"
+	switchName2 := "switch2"
 	value := true
 	for {
-		err = c8y.Send(client, value)
+		now := time.Now().UTC()
+		err = c8y.Send(client, switchName1, value, now)
+		err = c8y.Send(client, switchName2, !value, now)
 		if err != nil {
 			log.Fatalf("error: %v", err)
 		}
