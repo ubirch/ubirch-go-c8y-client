@@ -13,4 +13,6 @@
 
 # IDEA
 .idea/
-config.json
+
+main/main
+*.json
