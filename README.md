@@ -30,4 +30,4 @@ $ ./main
 
 - Accept the connection from the device in the Device Registration page in Cumulocity
 
-- The device credentials will be saved to a file: `<<UUID>>.ini`
+- The device credentials will be saved to a file: `<<UUID>>.json`
