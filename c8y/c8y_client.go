@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-func BootstrapHTTP(uuid string, tenant string, password string) map[string]string {
+func bootstrapHTTP(uuid string, tenant string, password string) (map[string]string, error) {
 	log.Println("Bootstrapping")
 	data, err := json.Marshal(map[string]string{"id": uuid})
 	if err != nil {
-		log.Fatalf(err.Error())
+		return nil, err
 	}
 	url := "https://" + tenant + ".cumulocity.com/devicecontrol/deviceCredentials"
 	client := http.Client{}
@@ -24,7 +24,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 	for {
 		request, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 		if err != nil {
-			log.Fatalf(err.Error())
+			return nil, err
 		}
 		request.Header.Set("Content-Type", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
 		request.Header.Set("Accept", "application/vnd.com.nsn.cumulocity.deviceCredentials+json")
@@ -32,7 +32,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 
 		resp, err := client.Do(request)
 		if err != nil {
-			log.Fatalf(err.Error())
+			return nil, err
 		}
 
 		log.Println("Response status:", resp.Status)
@@ -43,7 +43,7 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 			// read response body
 			bodyBytes, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				log.Fatalf("ERROR: unable to read response: %v", err)
+				return nil, err
 			}
 			bodyString := string(bodyBytes)
 			log.Println(bodyString)
@@ -51,56 +51,63 @@ func BootstrapHTTP(uuid string, tenant string, password string) map[string]strin
 			// parse json response body
 			err = json.Unmarshal(bodyBytes, &deviceCredentials)
 			if err != nil {
-				log.Fatalf("ERROR: unable to parse response: %v", err)
+				return nil, err
 			}
 			resp.Body.Close()
 
-			// get username and password from response
-			return deviceCredentials
+			return deviceCredentials, nil
 		}
 		resp.Body.Close()
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
-func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, error) {
+func getCredentials(uuid string, tenant string, bootstrapPW string) (map[string]string, error) {
 	var deviceCredentials map[string]string
 	// check for device credentials file
 	credentialsFilename := uuid + ".ini"
 	_, err := os.Stat(credentialsFilename)
 	if os.IsNotExist(err) { // file does not exist
 		// bootstrap
-		deviceCredentials = BootstrapHTTP(uuid, tenant, bootstrapPW)
+		deviceCredentials, err = bootstrapHTTP(uuid, tenant, bootstrapPW)
+		if err != nil {
+			return nil, err
+		}
+		// create file and save credentials to it
 		deviceCredentialsJson, err := json.Marshal(deviceCredentials)
 		if err != nil {
-			log.Fatalf(err.Error())
+			return nil, err
 		}
-
-		// create JSON file and write credentials to it
-		jsonFile, err := os.Create(credentialsFilename)
+		credentialsFile, err := os.Create(credentialsFilename)
 		if err != nil {
-			log.Fatalf(err.Error())
+			return nil, err
 		}
-		defer jsonFile.Close()
+		defer credentialsFile.Close()
 
-		_, err = jsonFile.Write(deviceCredentialsJson)
+		_, err = credentialsFile.Write(deviceCredentialsJson)
 		if err != nil {
-			log.Fatalf("ERROR: unable to write credentials to file %s: %v", credentialsFilename, err)
+			return nil, err
 		}
 		log.Printf("created credentials file: %s \n", credentialsFilename)
-
 	} else { // file exists
 		log.Println("reading credentials from file")
 		deviceCredentialsJson, err := ioutil.ReadFile(credentialsFilename)
 		if err != nil {
-			log.Fatalf("ERROR: unable to read credentials from file %s: %v", credentialsFilename, err)
+			return nil, err
 		}
 		err = json.Unmarshal(deviceCredentialsJson, &deviceCredentials)
 		if err != nil {
-			log.Fatalf("ERROR: unable to parse device credentials: %v", err)
+			return nil, err
 		}
 	}
+	return deviceCredentials, nil
+}
 
+func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, error) {
+	deviceCredentials, err := getCredentials(uuid, tenant, bootstrapPW)
+	if err != nil {
+		return nil, err
+	}
 	// initialize MQTT client
 	address := "tcps://" + tenant + ".cumulocity.com:8883/"
 	opts := mqtt.NewClientOptions().AddBroker(address)

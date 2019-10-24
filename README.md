@@ -28,5 +28,3 @@ $ ./main
 ```
 
 - Accept the connection from the device in the Device Registration page in Cumulocity
-
-[to be continued...]
