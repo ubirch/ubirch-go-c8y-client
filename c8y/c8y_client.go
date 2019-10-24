@@ -68,7 +68,7 @@ func bootstrapHTTP(uuid string, tenant string, password string) (map[string]stri
 func getCredentials(uuid string, tenant string, bootstrapPW string) (map[string]string, error) {
 	var deviceCredentials map[string]string
 	// check for device credentials file
-	credentialsFilename := uuid + ".ini"
+	credentialsFilename := uuid + ".json"
 	_, err := os.Stat(credentialsFilename)
 	if os.IsNotExist(err) { // file does not exist
 		// bootstrap

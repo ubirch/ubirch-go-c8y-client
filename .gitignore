@@ -15,5 +15,4 @@
 .idea/
 
 main/main
-config.json
-*.ini
+*.json
