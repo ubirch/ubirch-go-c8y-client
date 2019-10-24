@@ -9,6 +9,7 @@
 `import "github.com/ubirch/ubirch-go-c8y-client/c8y"`
 
 ## Run example
+> This example can be used to bootstrap and retrieve device credentials from Cumulocity.
 - Create `config.json` in `main` directory:
 ```json
 {
@@ -28,3 +29,5 @@ $ ./main
 ```
 
 - Accept the connection from the device in the Device Registration page in Cumulocity
+
+- The device credentials will be saved to a file: `<<UUID>>.ini`

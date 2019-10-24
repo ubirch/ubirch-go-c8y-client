@@ -9,11 +9,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
 func bootstrapHTTP(uuid string, tenant string, password string) (map[string]string, error) {
-	log.Println("Bootstrapping")
+	log.Println("Bootstrapping...")
 	data, err := json.Marshal(map[string]string{"id": uuid})
 	if err != nil {
 		return nil, err
@@ -35,9 +36,9 @@ func bootstrapHTTP(uuid string, tenant string, password string) (map[string]stri
 			return nil, err
 		}
 
-		log.Println("Response status:", resp.Status)
-
-		if resp.StatusCode == http.StatusCreated {
+		if resp.StatusCode == http.StatusNotFound {
+			log.Print("Acceptance pending: " + uuid)
+		} else if resp.StatusCode == http.StatusCreated {
 			deviceCredentials := make(map[string]string)
 
 			// read response body
@@ -56,6 +57,8 @@ func bootstrapHTTP(uuid string, tenant string, password string) (map[string]stri
 			resp.Body.Close()
 
 			return deviceCredentials, nil
+		} else {
+			log.Println("Response status:", resp.Status)
 		}
 		resp.Body.Close()
 		time.Sleep(5 * time.Second)
@@ -88,7 +91,7 @@ func getCredentials(uuid string, tenant string, bootstrapPW string) (map[string]
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("created credentials file: %s \n", credentialsFilename)
+		log.Printf("created Cumulocity device credentials file: %s \n", credentialsFilename)
 	} else { // file exists
 		log.Println("reading credentials from file")
 		deviceCredentialsJson, err := ioutil.ReadFile(credentialsFilename)
@@ -120,8 +123,11 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 
 	// callback for error messages
 	receive := func(client mqtt.Client, msg mqtt.Message) {
-		answer := string(msg.Payload())
-		log.Println("MQTT client received error message from Cumulocity: " + answer)
+		c8yError := string(msg.Payload())
+		if c8yError == "41,100,Device already existing" || strings.HasPrefix(c8yError, "50,100,") {
+			return
+		}
+		log.Println("MQTT client received error message from Cumulocity: " + c8yError)
 	}
 
 	// configure OnConnect callback: subscribe to error messages when connected
@@ -131,14 +137,15 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 		// subscribe to error messages
 		if token := c.Subscribe("s/e", 0, receive); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
-		} else {
-			c8yReady <- true
+			return
 		}
 
 		// create device identity in cumulocity registry
 		deviceCreationMsg := "100," + uuid + ",c8y_MQTTDevice" // "100,Device Name,Device Type"
 		if token := c.Publish("s/us", 0, false, deviceCreationMsg); token.Wait() && token.Error() != nil {
 			c8yError <- token.Error()
+		} else {
+			c8yReady <- true
 		}
 	}
 
