@@ -1,4 +1,4 @@
-# ubirch-go-c8y-client [WIP]
+# [WIP] ubirch-go-c8y-client
 
 ## Instalation
 
@@ -14,8 +14,8 @@
 ```json
 {
   "uuid": "<UUID>",
-  "bootstrap": "<cumulocity password>",
-  "tenant": "<tenantID>"
+  "tenant": "<cumulocity tenant ID>",
+  "bootstrap": "<cumulocity password>"
 }
 ```
 
@@ -23,11 +23,11 @@
 
 - Build and run the example
 ```
-$ cd $HOME/go/src/github.com/ubirch/ubirch-go-c8y-client/main
+$ cd main
 $ go build
 $ ./main
 ```
 
 - Accept the connection from the device in the Device Registration page in Cumulocity
 
-- The device credentials will be saved to a file: `<<UUID>>.json`
+- The device credentials will be saved to a file in `main` directory: `<<UUID>>.json`
