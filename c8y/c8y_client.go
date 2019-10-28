@@ -112,10 +112,10 @@ func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, err
 		return nil, err
 	}
 	// initialize MQTT client
-	address := "tcps://" + tenant + ".cumulocity.com:8883/"
+	address := "tcps://" + deviceCredentials["tenantId"] + ".cumulocity.com:8883/"
 	opts := mqtt.NewClientOptions().AddBroker(address)
 	opts.SetClientID(uuid)
-	opts.SetUsername(tenant + "/" + deviceCredentials["username"])
+	opts.SetUsername(deviceCredentials["tenantId"] + "/" + deviceCredentials["username"])
 	opts.SetPassword(deviceCredentials["password"])
 
 	c8yError := make(chan error)
