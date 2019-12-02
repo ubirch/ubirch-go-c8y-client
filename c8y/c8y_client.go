@@ -65,10 +65,10 @@ func bootstrapHTTP(uuid string, tenant string, password string) (map[string]stri
 	}
 }
 
-func getCredentials(uuid string, tenant string, bootstrapPW string) (map[string]string, error) {
+func getCredentials(uuid string, tenant string, bootstrapPW string, path string) (map[string]string, error) {
 	var deviceCredentials map[string]string
 	// check for device credentials file
-	credentialsFilename := uuid + ".json"
+	credentialsFilename := path + uuid + ".json"
 	_, err := os.Stat(credentialsFilename)
 	if os.IsNotExist(err) { // file does not exist
 		// bootstrap
@@ -106,8 +106,8 @@ func getCredentials(uuid string, tenant string, bootstrapPW string) (map[string]
 	return deviceCredentials, nil
 }
 
-func GetClient(uuid string, tenant string, bootstrapPW string) (mqtt.Client, error) {
-	deviceCredentials, err := getCredentials(uuid, tenant, bootstrapPW)
+func GetClient(uuid string, tenant string, bootstrapPW string, path string) (mqtt.Client, error) {
+	deviceCredentials, err := getCredentials(uuid, tenant, bootstrapPW, path)
 	if err != nil {
 		return nil, err
 	}

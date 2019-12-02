@@ -21,21 +21,30 @@ func main() {
 
 	log.Println("UUID: " + UUID)
 
-	client, err := c8y.GetClient(UUID, c8yTenant, c8yBootstrap)
+	client, err := c8y.GetClient(UUID, c8yTenant, c8yBootstrap, "")
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 	defer client.Disconnect(0)
 
-	switchName1 := "switch1"
-	var value byte = 1
+	switchName1 := UUID + "-A"
+	switchName2 := UUID + "-B"
+	var value1 byte = 1
+	var value2 byte = 1
 	for {
 		now := time.Now().UTC()
-		err = c8y.Send(client, switchName1, value, now)
+		err = c8y.Send(client, switchName1, value1, now)
 		if err != nil {
 			log.Printf("error: %v", err)
 		}
-		value ^= 1
-		time.Sleep(5 * time.Second)
+		err = c8y.Send(client, switchName2, value2, now)
+		if err != nil {
+			log.Printf("error: %v", err)
+		}
+		value1 ^= 1
+		if value1 == 1 {
+			value2 ^= 1
+		}
+		time.Sleep(30 * time.Second)
 	}
 }
